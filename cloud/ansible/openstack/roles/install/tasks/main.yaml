@@ -1,3 +1,4 @@
+
 - name: Waiting for SSH connection
   wait_for_connection:
     delay: 30
@@ -5,6 +6,83 @@
 
 - name: Gathering facts
   setup:
+
+- name: Updating Instance
+  apt:
+    upgrade: dist
+
+- name: Upgrading Instance
+  apt:
+    name: "*"
+    state: latest
+
+- name: Creating Folder for Prometheus Noder Install
+  file:
+    path: /tmpNode
+    state: directory
+
+- name: Downloading Prometheus Node
+  get_url: 
+    url: https://github.com/prometheus/node_exporter/releases/download/v0.18.1/node_exporter-0.18.1.linux-amd64.tar.gz 
+    dest: /tmpNode/node_exporter-0.18.1.linux-amd64.tar.gz
+
+- name: Unarchiving Prometheus Node
+  unarchive:
+    src: /tmpNode/node_exporter-0.18.1.linux-amd64.tar.gz
+    dest: /tmpNode
+    remote_src: yes
+
+- name: Moving Prometheus Node files
+  command: mv /tmpNode/node_exporter-0.18.1.linux-amd64/node_exporter /usr/local/bin/
+  become: yes
+
+#  file:
+#    src: /tmpNode/node_exporter-0.18.1.linux-amd64/node_exporter
+#    dest: /usr/local/bin/
+
+- name: Creating new User
+  user:
+    name: node_exporter
+    shell: /usr/bin/false
+    group: sudo
+    system: yes
+    append: yes
+
+#  command: useradd -rs /bin/false node_exporter
+
+- name: Ensure group mode_exporter exists
+  group:
+    name: node_exporter
+    state: present
+
+- name: Creating Config File for Node
+  command: touch /etc/systemd/system/node_exporter.service
+
+- name: install Prometheus-Node file
+  blockinfile:
+    path: /etc/systemd/system/node_exporter.service
+    block: | 
+      [Unit]
+      Description=Node Exporter
+      After=network.target
+
+      [Service]
+      User=node_exporter
+      Group=node_exporter
+      Type=simple
+      ExecStart=/usr/local/bin/node_exporter
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: System Deamon neu starten
+  systemd: daemon_reload=yes
+
+- name: Node Service starten2
+  command: systemctl start node_exporter
+
+- name: Node Exporter im System Startup aktivieren
+  command: systemctl enable node_exporter
 
 - name: Cloning T-Pot install directory
   git:
